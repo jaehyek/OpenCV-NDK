@@ -1,0 +1,1 @@
+This Project was forked from https://github.com/sjfricke/OpenCV-NDK
