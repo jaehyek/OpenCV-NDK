@@ -97,6 +97,7 @@ void Image_Reader::ImageCallback(AImageReader *reader)
 
         AImage_delete(image);
     }
+
 }
 
 ANativeWindow *Image_Reader::GetNativeWindow(void)
@@ -243,6 +244,7 @@ bool Image_Reader::DisplayImage(ANativeWindow_Buffer *buf, AImage *image)
     int32_t srcFormat = -1;
     AImage_getFormat(image, &srcFormat);
     ASSERT(AIMAGE_FORMAT_YUV_420_888 == srcFormat, "Failed to get format");
+
     int32_t srcPlanes = 0;
     AImage_getNumberOfPlanes(image, &srcPlanes);
     ASSERT(srcPlanes == 3, "Is not 3 planes");

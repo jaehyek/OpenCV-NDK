@@ -111,7 +111,7 @@ bool Native_Camera::MatchCaptureSizeRequest(ImageFormat *resView, int32_t width,
             Display_Dimension res(entry.data.i32[i * 4 + 1],
                                   entry.data.i32[i * 4 + 2]);
             if (!disp.IsSameRatio(res)) continue;
-            if (format == AIMAGE_FORMAT_YUV_420_888 && foundRes > res)
+            if (foundRes > res)
             {
                 foundIt = true;
                 foundRes = res;
@@ -148,6 +148,8 @@ bool Native_Camera::CreateCaptureSession(ANativeWindow *window)
     camera_status_t cameraStatus = ACAMERA_OK;
 
     ACaptureSessionOutputContainer_create(&m_capture_session_output_container);
+
+    // 주어진 ANativeWindow 객체에 대한 참조를 얻습니다. 참조가 제거될 때까지 객체가 삭제되지 못하게 합니다
     ANativeWindow_acquire(window);
     ACaptureSessionOutput_create(window, &m_session_output);
     ACaptureSessionOutputContainer_add(m_capture_session_output_container,
