@@ -12,6 +12,7 @@ LOCAL_CFLAGS    := -Werror -Wno-write-strings -std=c++11
 LOCAL_SRC_FILES := native-lib.cpp \
                    CV_Main.cpp \
                    Native_Camera.cpp \
-                   Image_Reader.cpp
+                   Image_Reader.cpp \
+                   native-camera-jni.cpp
 LOCAL_LDLIBS    := -llog -landroid -lcamera2ndk -lmediandk
 include $(BUILD_SHARED_LIBRARY)

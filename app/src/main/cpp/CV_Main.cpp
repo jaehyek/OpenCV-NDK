@@ -85,7 +85,7 @@ void CV_Main::SetNativeWindow(ANativeWindow *native_window)
 
 void CV_Main::SetUpCamera()
 {
-
+    // 단순히 camera 그 자체를 생성
     m_native_camera = new Native_Camera(m_selected_camera_type);
 
     m_native_camera->MatchCaptureSizeRequest(&m_view,
@@ -100,9 +100,9 @@ void CV_Main::SetUpCamera()
 
     m_image_reader = new Image_Reader(&m_view, AIMAGE_FORMAT_YUV_420_888);
     m_image_reader->SetPresentRotation(m_native_camera->GetOrientation());
-
     ANativeWindow *image_reader_window = m_image_reader->GetNativeWindow();
 
+    // camera capture 하고 ,target 에 출력시  필요한 session들을 만든다.
     m_camera_ready = m_native_camera->CreateCaptureSession(image_reader_window);
 }
 
