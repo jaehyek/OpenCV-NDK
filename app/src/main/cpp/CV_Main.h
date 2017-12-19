@@ -22,6 +22,7 @@
 #include <string>
 #include <vector>
 #include <thread>
+#include <map>
 
 class CV_Main
 {

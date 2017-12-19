@@ -24,6 +24,7 @@
 #include <media/NdkImage.h>
 #include <media/NdkImageReader.h>
 #include <cstdlib>
+#include <camera/NdkCameraMetadata.h>
 
 
 #define LOG_ERROR(buf, ...) sprintf(buf, __VA_ARGS__);                             LOGI("%s", buf);
@@ -527,8 +528,6 @@ public:
         AImage_delete(img);
     }
 
-    acamera_metadata_enum_android_control_af_mode_t
-
     // count, acquire image but not delete the image
     static void acquireImageCb(void *obj, AImageReader *reader)
     {
@@ -583,7 +582,6 @@ private:
     int mOnImageAvailableCount = 0;
     char mDumpFilePathBase[512];
     char filenamecapture [512] ;
-    uint8_t* imageBuffer_ = nullptr;
     int32_t* RGBBuffer_ = nullptr;
 };
 
@@ -613,75 +611,132 @@ public:
         return false;
     }
 
-    bool set_metadata_control_mode(ACaptureRequest *request, acamera_metadata_enum_android_control_mode_t t_control_mode)
+private:
+    const ACameraMetadata *mChars;
+};
+
+extern std::map<int, const char* > ACAMERA_metadata_tagnamemap ;
+class CameraMetaData
+{
+public:
+
+    void get_metadata_all_tags()
+    {
+        int32_t numTags = 0;
+        const uint32_t *tags = nullptr;
+        cameraStatus = ACaptureRequest_getAllTags(mRequest, &numTags, &tags);
+        ASSERT(cameraStatus == ACAMERA_OK, "Failed to ACaptureRequest_getAllTags (reason: %d)", cameraStatus);
+
+        ACameraMetadata_const_entry entry;
+        for (int tid = 0; tid < numTags; tid++)
+        {
+            uint32_t tagId = tags[tid];
+            LOGI("%s capture request contains key %x\n", __FUNCTION__, tagId);
+            // uint32_t sectionId = tagId >> 16;
+
+            cameraStatus = ACaptureRequest_getConstEntry(mRequest, tagId, &entry);
+            ASSERT(cameraStatus == ACAMERA_OK, "Failed to ACaptureRequest_getConstEntry(reason: %d)", cameraStatus);
+            LOGI("TagName : %s, typebyte:%d, count:%d \n", ACAMERA_metadata_tagnamemap[tagId], entry.type, entry.count);
+            if ( entry.type == 0 )
+            {
+                for(int i = 0 ; i < entry.count ;i ++)
+                    LOGI("%d ", entry.data.u8[i]);
+            }
+            else if ( entry.type == 1 )
+            {
+                for(int i = 0 ; i < entry.count ;i ++)
+                    LOGI("%d ", entry.data.i32[i]);
+            }
+            else if ( entry.type == 2 )
+            {
+                for(int i = 0 ; i < entry.count ;i ++)
+                    LOGI("%f ", entry.data.f[i]);
+            }
+//            else if ( entry.type == 3 )
+//            {
+//                for(int i = 0 ; i < entry.count ;i ++)
+//                    LOGI("%I64d ", entry.data.i64[i]);
+//            }
+            else if ( entry.type == 4 )
+            {
+                for(int i = 0 ; i < entry.count ;i ++)
+                    LOGI("%f ", entry.data.d[i]);
+            }
+
+        }
+    }
+
+    bool set_metadata_control_mode( acamera_metadata_enum_android_control_mode_t t_control_mode)
     {
         // t_control_mode : ACAMERA_CONTROL_MODE_OFF, ACAMERA_CONTROL_MODE_AUTO
         ACameraMetadata_const_entry entry;
-        cameraStatus = ACaptureRequest_getConstEntry(request, ACAMERA_CONTROL_MODE, &entry);
+        cameraStatus = ACaptureRequest_getConstEntry(mRequest, ACAMERA_CONTROL_MODE, &entry);
         ASSERT(cameraStatus == ACAMERA_OK, "Failed to ACAMERA_CONTROL_MODE (reason: %d)", cameraStatus);
         ASSERT(entry.tag == ACAMERA_CONTROL_MODE && entry.type == ACAMERA_TYPE_BYTE && entry.count == 1,
                "ACameraMetadata_const_entry failed");
 
         uint8_t control_mode = t_control_mode;
-        cameraStatus = ACaptureRequest_setEntry_u8( request, ACAMERA_CONTROL_MODE, /*count*/ 1, &control_mode);
+        cameraStatus = ACaptureRequest_setEntry_u8( mRequest, ACAMERA_CONTROL_MODE, /*count*/ 1, &control_mode);
         ASSERT(cameraStatus == ACAMERA_OK, "ACaptureRequest_setEntry_u8 (reason: %d)", cameraStatus);
 
         // read and confirm
-        cameraStatus = ACaptureRequest_getConstEntry(request, ACAMERA_CONTROL_MODE, &entry);
+        cameraStatus = ACaptureRequest_getConstEntry(mRequest, ACAMERA_CONTROL_MODE, &entry);
         ASSERT(cameraStatus == ACAMERA_OK, "Failed to ACAMERA_CONTROL_MODE (reason: %d)", cameraStatus);
         ASSERT(entry.data.u8[0] == control_mode, "E mode key is not updated");
 
         return true;
     }
 
-    bool set_metadata_ae_mode(ACaptureRequest *request, acamera_metadata_enum_android_control_ae_mode_t t_ae_mode)
+    bool set_metadata_ae_mode( acamera_metadata_enum_android_control_ae_mode_t t_ae_mode)
     {
         // t_aeMode : ACAMERA_CONTROL_AE_MODE_OFF, ACAMERA_CONTROL_AE_MODE_ON
         ACameraMetadata_const_entry entry;
-        cameraStatus = ACaptureRequest_getConstEntry(request, ACAMERA_CONTROL_AE_MODE, &entry);
+        cameraStatus = ACaptureRequest_getConstEntry(mRequest, ACAMERA_CONTROL_AE_MODE, &entry);
         ASSERT(cameraStatus == ACAMERA_OK, "Failed to ACAMERA_CONTROL_AE_MODE (reason: %d)", cameraStatus);
         ASSERT(entry.tag == ACAMERA_CONTROL_AE_MODE && entry.type == ACAMERA_TYPE_BYTE && entry.count == 1,
                "ACameraMetadata_const_entry failed");
 
         // try set AE_MODE_ON
         uint8_t ae_mode = t_ae_mode;
-        cameraStatus = ACaptureRequest_setEntry_u8( request, ACAMERA_CONTROL_AE_MODE, /*count*/ 1, &ae_mode);
+        cameraStatus = ACaptureRequest_setEntry_u8( mRequest, ACAMERA_CONTROL_AE_MODE, /*count*/ 1, &ae_mode);
         ASSERT(cameraStatus == ACAMERA_OK, "ACaptureRequest_setEntry_u8 (reason: %d)", cameraStatus);
 
         // read and confirm
-        cameraStatus = ACaptureRequest_getConstEntry(request, ACAMERA_CONTROL_AE_MODE, &entry);
+        cameraStatus = ACaptureRequest_getConstEntry(mRequest, ACAMERA_CONTROL_AE_MODE, &entry);
         ASSERT(cameraStatus == ACAMERA_OK, "Failed to ACAMERA_CONTROL_AE_MODE (reason: %d)", cameraStatus);
         ASSERT(entry.data.u8[0] == ae_mode, "E mode key is not updated");
 
         return true;
     }
 
-    bool set_metadata_af_mode(ACaptureRequest *request, acamera_metadata_enum_android_control_af_mode_t t_af_mode)
+    bool set_metadata_af_mode( acamera_metadata_enum_android_control_af_mode_t t_af_mode)
     {
         // t_aeMode : ACAMERA_CONTROL_AF_MODE_OFF, ACAMERA_CONTROL_AF_MODE_AUTO
         ACameraMetadata_const_entry entry;
-        cameraStatus = ACaptureRequest_getConstEntry(request, ACAMERA_CONTROL_AF_MODE, &entry);
+        cameraStatus = ACaptureRequest_getConstEntry(mRequest, ACAMERA_CONTROL_AF_MODE, &entry);
         ASSERT(cameraStatus == ACAMERA_OK, "Failed to ACAMERA_CONTROL_AF_MODE (reason: %d)", cameraStatus);
         ASSERT(entry.tag == ACAMERA_CONTROL_AF_MODE && entry.type == ACAMERA_TYPE_BYTE && entry.count == 1,
                "ACameraMetadata_const_entry failed");
 
         // try set AE_MODE_ON
         uint8_t af_mode = t_af_mode;
-        cameraStatus = ACaptureRequest_setEntry_u8( request, ACAMERA_CONTROL_AF_MODE, /*count*/ 1, &af_mode);
+        cameraStatus = ACaptureRequest_setEntry_u8( mRequest, ACAMERA_CONTROL_AF_MODE, /*count*/ 1, &af_mode);
         ASSERT(cameraStatus == ACAMERA_OK, "ACaptureRequest_setEntry_u8 (reason: %d)", cameraStatus);
 
         // read and confirm
-        cameraStatus = ACaptureRequest_getConstEntry(request, ACAMERA_CONTROL_AF_MODE, &entry);
+        cameraStatus = ACaptureRequest_getConstEntry(mRequest, ACAMERA_CONTROL_AF_MODE, &entry);
         ASSERT(cameraStatus == ACAMERA_OK, "Failed to ACAMERA_CONTROL_AF_MODE (reason: %d)", cameraStatus);
         ASSERT(entry.data.u8[0] == af_mode, "E mode key is not updated");
 
         return true;
     }
 
-private:
-    const ACameraMetadata *mChars;
+public:
     camera_status_t cameraStatus;
+    ACaptureRequest *mRequest;
+
 };
+
 
 class CameraCaptureListener
 {
@@ -762,6 +817,8 @@ private:
         CameraCaptureListener::onCaptureSequenceAborted,
         CameraCaptureListener::onCaptureBufferLost,
     };
+
+    CameraMetaData mcamerametadata ;
 
     ACameraIdList *mCameraIdList = nullptr;
     ACameraDevice *mDevice = nullptr;
@@ -1145,6 +1202,11 @@ public:
                           mCameraId, ret);
                 return ret;
             }
+
+            // print out the camera characteric
+            mcamerametadata.mRequest = mPreviewRequest;
+            mcamerametadata.get_metadata_all_tags();
+
         }
         else
         {

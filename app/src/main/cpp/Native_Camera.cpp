@@ -1,7 +1,7 @@
 #include "Native_Camera.h"
 
 
-
+extern const char* ACAMERA_metadata_tagnamelist[];
 
 Native_Camera::Native_Camera(camera_type type)
 {
