@@ -670,10 +670,6 @@ public:
     {
         // t_control_mode : ACAMERA_CONTROL_MODE_OFF, ACAMERA_CONTROL_MODE_AUTO
         ACameraMetadata_const_entry entry;
-        cameraStatus = ACaptureRequest_getConstEntry(mRequest, ACAMERA_CONTROL_MODE, &entry);
-        ASSERT(cameraStatus == ACAMERA_OK, "Failed to ACAMERA_CONTROL_MODE (reason: %d)", cameraStatus);
-        ASSERT(entry.tag == ACAMERA_CONTROL_MODE && entry.type == ACAMERA_TYPE_BYTE && entry.count == 1,
-               "ACameraMetadata_const_entry failed");
 
         uint8_t control_mode = t_control_mode;
         cameraStatus = ACaptureRequest_setEntry_u8( mRequest, ACAMERA_CONTROL_MODE, /*count*/ 1, &control_mode);
@@ -691,10 +687,6 @@ public:
     {
         // t_aeMode : ACAMERA_CONTROL_AE_MODE_OFF, ACAMERA_CONTROL_AE_MODE_ON
         ACameraMetadata_const_entry entry;
-        cameraStatus = ACaptureRequest_getConstEntry(mRequest, ACAMERA_CONTROL_AE_MODE, &entry);
-        ASSERT(cameraStatus == ACAMERA_OK, "Failed to ACAMERA_CONTROL_AE_MODE (reason: %d)", cameraStatus);
-        ASSERT(entry.tag == ACAMERA_CONTROL_AE_MODE && entry.type == ACAMERA_TYPE_BYTE && entry.count == 1,
-               "ACameraMetadata_const_entry failed");
 
         // try set AE_MODE_ON
         uint8_t ae_mode = t_ae_mode;
@@ -713,10 +705,6 @@ public:
     {
         // t_aeMode : ACAMERA_CONTROL_AF_MODE_OFF, ACAMERA_CONTROL_AF_MODE_AUTO
         ACameraMetadata_const_entry entry;
-        cameraStatus = ACaptureRequest_getConstEntry(mRequest, ACAMERA_CONTROL_AF_MODE, &entry);
-        ASSERT(cameraStatus == ACAMERA_OK, "Failed to ACAMERA_CONTROL_AF_MODE (reason: %d)", cameraStatus);
-        ASSERT(entry.tag == ACAMERA_CONTROL_AF_MODE && entry.type == ACAMERA_TYPE_BYTE && entry.count == 1,
-               "ACameraMetadata_const_entry failed");
 
         // try set AE_MODE_ON
         uint8_t af_mode = t_af_mode;
@@ -1206,6 +1194,7 @@ public:
             // print out the camera characteric
             mcamerametadata.mRequest = mPreviewRequest;
             mcamerametadata.get_metadata_all_tags();
+            mcamerametadata.set_metadata_af_mode(ACAMERA_CONTROL_AF_MODE_CONTINUOUS_PICTURE);
 
         }
         else
