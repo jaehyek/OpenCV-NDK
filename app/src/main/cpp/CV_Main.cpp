@@ -1,5 +1,6 @@
 #include "CV_Main.h"
 
+
 CV_Main::CV_Main()
         : m_camera_ready(false), m_image(nullptr), m_image_reader(nullptr),
           m_native_camera(nullptr), scan_mode(false)
@@ -69,43 +70,180 @@ void CV_Main::OnCreate(JNIEnv *env, jobject caller_activity)
     // on_callback = env->GetMethodID(handler_class, "JAVA_FUNCTION", "()V");
 }
 
-void CV_Main::OnPause()
+
+void CV_Main::openCamera(JNIEnv *env, jclass clazz, jobject jPreviewSurface, jstring jOutPath)
 {
+    const char* poutPath = env->GetStringUTFChars(jOutPath, nullptr);
+    strcpy(outPath, poutPath);
+    env->ReleaseStringUTFChars(jOutPath, poutPath);
+
+    // set saving path to Imagereader
+    readerListener.setDumpFilePathBase(outPath);
+
+    // CameraIdList 구하기
+    camera_status_t ret = testCase.initWithErrorLog();
+    ASSERT(ret == ACAMERA_OK, "testCase.initWithErrorLog() ==> error");
+    ASSERT(testCase.getNumCameras() >= 1 , "the number of Camera  == 0");
+
+    const char *cameraId = testCase.getCameraId(m_selected_camera_type);
+
+    ret = testCase.openCamera(cameraId);
+    ASSERT(ret == ACAMERA_OK, "testCase.openCamera() ==> error");
+
+    usleep(100000); // sleep to give some time for callbacks to happen
+    if (testCase.isCameraAvailable(cameraId))
+    {
+        LOG_ERROR(errorString, "Camera %s should be unavailable now", cameraId);
+    }
+
+    ANativeWindow *previewAnw = testCase.initPreviewAnw(env, jPreviewSurface);
+    ASSERT(previewAnw != nullptr, "testCase.initPreviewAnw() ==> error");
+
+    readerListener.setDumpFilePathBase(outPath);
+    media_status_t mediaRet = AMEDIA_ERROR_UNKNOWN;
+
+    mediaRet = testCase.initImageReaderWithErrorLog(
+            ANativeWindow_getWidth(previewAnw),ANativeWindow_getHeight(previewAnw),
+            AIMAGE_FORMAT_YUV_420_888, NUM_TEST_IMAGES,  &readerCb);
+    // AIMAGE_FORMAT_JPEG, AIMAGE_FORMAT_YUV_420_888
+
+    ASSERT(mediaRet == AMEDIA_OK, "testCase.initImageReaderWithErrorLog() ==> error");
+
+    ret = testCase.createCaptureSessionWithLog();
+    ASSERT(ret == ACAMERA_OK, "testCase.createCaptureSessionWithLog() ==> error");
+
+    ret = testCase.createRequestsWithErrorLog();
+    ASSERT(ret == ACAMERA_OK, "testCase.createRequestsWithErrorLog() ==> error");
+
+    ret = testCase.startPreview();
+    ASSERT(ret == ACAMERA_OK, "testCase.startPreview() ==> error");
+
+
 }
 
-void CV_Main::OnDestroy()
+//void CV_Main::openCamera()
+//{
+//    // 단순히 camera 그 자체를 생성
+//    m_native_camera = new Native_Camera(m_selected_camera_type);
+//
+//    m_native_camera->MatchCaptureSizeRequest(&m_view,
+//                                             ANativeWindow_getWidth(m_native_window),
+//                                             ANativeWindow_getHeight(m_native_window));
+//
+////    ASSERT(m_view.width && m_view.height, "Could not find supportable resolution");
+////
+////    // Here we set the buffer to use RGBX_8888 as default might be; RGB_565
+////    ANativeWindow_setBuffersGeometry(m_native_window, m_view.height, m_view.width,
+////                                     WINDOW_FORMAT_RGBX_8888);
+////
+////    m_image_reader = new Image_Reader(&m_view, AIMAGE_FORMAT_YUV_420_888);
+////    m_image_reader->SetPresentRotation(m_native_camera->GetOrientation());
+////    ANativeWindow *image_reader_window = m_image_reader->GetNativeWindow();
+//
+//    // camera capture 하고 ,target 에 출력시  필요한 session들을 만든다.
+////    m_camera_ready = m_native_camera->CreateCaptureSession(image_reader_window);
+//    m_camera_ready = m_native_camera->CreateCaptureSession(m_native_window);
+//}
+
+void CV_Main::captureCamera(JNIEnv *env, jobject clazz)
 {
+    camera_status_t ret;
+
+    // before capture, make filename to save jepg.
+    time_t rawtime;
+    struct tm * timeinfo;
+    char buffer[256];
+
+    time (&rawtime);
+    timeinfo = localtime(&rawtime);
+
+    strftime(buffer,sizeof(buffer),"img%Y%m%d_%H%M%S",timeinfo);
+    readerListener.setFilenameCapture(buffer);
+
+
+    for (int capture = 0; capture < NUM_TEST_IMAGES; capture++)
+    {
+        ret = testCase.takePicture();
+        ASSERT(ret == ACAMERA_OK, "testCase.takePicture() ==> error");
+    }
+    // wait until all capture finished
+    for (int i = 0; i < 50; i++)
+    {
+        usleep(100000); // sleep 100ms
+        if (readerListener.onImageAvailableCount() == NUM_TEST_IMAGES)
+        {
+            LOGI("Session take ~%d ms to capture %d images",
+                 i * 100, NUM_TEST_IMAGES);
+            break;
+        }
+    }
+    ASSERT(readerListener.onImageAvailableCount() == NUM_TEST_IMAGES, "Not captured to NUM_TEST_IMAGES ==> error");
+
 }
 
-void CV_Main::SetNativeWindow(ANativeWindow *native_window)
+void CV_Main::closeCamera(JNIEnv *env, jobject clazz)
 {
-    // Save native window
-    m_native_window = native_window;
+    camera_status_t ret;
+    m_camera_thread_stopped = true;
+
+    ret = testCase.resetWithErrorLog();
+    ASSERT(ret == ACAMERA_OK, "testCase.resetWithErrorLog() ==> error");
+
+    usleep(100000);
+    ret = testCase.deInit();
+    ASSERT(ret == ACAMERA_OK, "testCase.resetWithErrorLog() ==> error");
+
+    //==================================================================
+    if (m_native_camera != nullptr)
+    {
+        delete m_native_camera;
+        m_native_camera = nullptr;
+    }
+
 }
 
-void CV_Main::SetUpCamera()
+//void CV_Main::closeCamera()
+//{
+//    m_camera_thread_stopped = true;
+//
+//    if (m_native_camera != nullptr)
+//    {
+//        delete m_native_camera;
+//        m_native_camera = nullptr;
+//    }
+//
+//
+//}
+
+
+void CV_Main::FlipCamera(JNIEnv *env, jclass clazz, jobject jPreviewSurface, jstring jOutPath)
 {
-    // 단순히 camera 그 자체를 생성
-    m_native_camera = new Native_Camera(m_selected_camera_type);
+    m_camera_thread_stopped = false;
+    closeCamera(env,clazz) ;
 
-    m_native_camera->MatchCaptureSizeRequest(&m_view,
-                                             ANativeWindow_getWidth(m_native_window),
-                                             ANativeWindow_getHeight(m_native_window));
+    // reset info
+    if (m_image_reader != nullptr)
+    {
+        delete (m_image_reader);
+        m_image_reader = nullptr;
+    }
 
-    ASSERT(m_view.width && m_view.height, "Could not find supportable resolution");
+    if (m_selected_camera_type == FRONT_CAMERA)
+    {
+        m_selected_camera_type = BACK_CAMERA;
+    }
+    else
+    {
+        m_selected_camera_type = FRONT_CAMERA;
+    }
 
-    // Here we set the buffer to use RGBX_8888 as default might be; RGB_565
-    ANativeWindow_setBuffersGeometry(m_native_window, m_view.height, m_view.width,
-                                     WINDOW_FORMAT_RGBX_8888);
+    openCamera(env, clazz, jPreviewSurface, jOutPath);
 
-    m_image_reader = new Image_Reader(&m_view, AIMAGE_FORMAT_YUV_420_888);
-    m_image_reader->SetPresentRotation(m_native_camera->GetOrientation());
-    ANativeWindow *image_reader_window = m_image_reader->GetNativeWindow();
-
-    // camera capture 하고 ,target 에 출력시  필요한 session들을 만든다.
-    m_camera_ready = m_native_camera->CreateCaptureSession(image_reader_window);
+//    std::thread loopThread(&CV_Main::CameraLoop, this);
+//    loopThread.detach();
 }
 
+//========================================================
 void CV_Main::CameraLoop()
 {
     bool buffer_printout = false;
@@ -148,7 +286,15 @@ void CV_Main::CameraLoop()
         ANativeWindow_unlockAndPost(m_native_window);
         ANativeWindow_release(m_native_window);
     }
-    FlipCamera();
+
+}
+
+// When scan button is hit
+void CV_Main::RunCV()
+{
+    scan_mode = true;
+    total_t = 0;
+    start_t = clock();
 }
 
 void CV_Main::FaceDetect(cv::Mat &frame)
@@ -199,55 +345,4 @@ void CV_Main::FaceDetect(cv::Mat &frame)
     }
     start_t = clock();
 
-}
-
-// When scan button is hit
-void CV_Main::RunCV()
-{
-    scan_mode = true;
-    total_t = 0;
-    start_t = clock();
-}
-
-void CV_Main::HaltCamera()
-{
-    if (m_native_camera == nullptr)
-    {
-        LOGE("Can't flip camera without camera instance");
-        return; // need to setup camera
-    }
-    else if (m_native_camera->GetCameraCount() < 2)
-    {
-        LOGE("Only one camera is available"); // TODO - remove button if this is true
-        return; // need a second camera to flip with
-    }
-
-    m_camera_thread_stopped = true;
-}
-
-void CV_Main::FlipCamera()
-{
-    m_camera_thread_stopped = false;
-
-    // reset info
-    if (m_image_reader != nullptr)
-    {
-        delete (m_image_reader);
-        m_image_reader = nullptr;
-    }
-    delete m_native_camera;
-
-    if (m_selected_camera_type == FRONT_CAMERA)
-    {
-        m_selected_camera_type = BACK_CAMERA;
-    }
-    else
-    {
-        m_selected_camera_type = FRONT_CAMERA;
-    }
-
-    SetUpCamera();
-
-    std::thread loopThread(&CV_Main::CameraLoop, this);
-    loopThread.detach();
 }

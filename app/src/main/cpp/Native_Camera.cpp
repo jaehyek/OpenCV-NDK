@@ -1,100 +1,6 @@
 #include "Native_Camera.h"
 
-class StaticInfo
-{
-public:
-    explicit StaticInfo(ACameraMetadata *chars) : mChars(chars)
-    {
-    }
 
-    bool isColorOutputSupported()
-    {
-        return isCapabilitySupported(ACAMERA_REQUEST_AVAILABLE_CAPABILITIES_BACKWARD_COMPATIBLE);
-    }
-
-    bool isCapabilitySupported(acamera_metadata_enum_android_request_available_capabilities_t cap)
-    {
-        ACameraMetadata_const_entry entry;
-        ACameraMetadata_getConstEntry(mChars, ACAMERA_REQUEST_AVAILABLE_CAPABILITIES, &entry);
-        for (uint32_t i = 0; i < entry.count; i++)
-        {
-            if (entry.data.u8[i] == cap)
-            {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    bool set_metadata_control_mode(ACaptureRequest *request, acamera_metadata_enum_android_control_mode_t t_control_mode)
-    {
-        // t_control_mode : ACAMERA_CONTROL_MODE_OFF, ACAMERA_CONTROL_MODE_AUTO
-        ACameraMetadata_const_entry entry;
-        cameraStatus = ACaptureRequest_getConstEntry(request, ACAMERA_CONTROL_MODE, &entry);
-        ASSERT(cameraStatus == ACAMERA_OK, "Failed to ACAMERA_CONTROL_MODE (reason: %d)", cameraStatus);
-        ASSERT(entry.tag == ACAMERA_CONTROL_MODE && entry.type == ACAMERA_TYPE_BYTE && entry.count != 1,
-               "ACameraMetadata_const_entry failed");
-
-        uint8_t control_mode = t_control_mode;
-        cameraStatus = ACaptureRequest_setEntry_u8( request, ACAMERA_CONTROL_MODE, /*count*/ 1, &control_mode);
-        ASSERT(cameraStatus == ACAMERA_OK, "ACaptureRequest_setEntry_u8 (reason: %d)", cameraStatus);
-
-        // read and confirm
-        cameraStatus = ACaptureRequest_getConstEntry(request, ACAMERA_CONTROL_MODE, &entry);
-        ASSERT(cameraStatus == ACAMERA_OK, "Failed to ACAMERA_CONTROL_MODE (reason: %d)", cameraStatus);
-        ASSERT(entry.data.u8[0] == control_mode, "E mode key is not updated");
-
-        return true;
-    }
-
-    bool set_metadata_ae_mode(ACaptureRequest *request, acamera_metadata_enum_android_control_ae_mode_t t_ae_mode)
-    {
-        // t_aeMode : ACAMERA_CONTROL_AE_MODE_OFF, ACAMERA_CONTROL_AE_MODE_ON
-        ACameraMetadata_const_entry entry;
-        cameraStatus = ACaptureRequest_getConstEntry(request, ACAMERA_CONTROL_AE_MODE, &entry);
-        ASSERT(cameraStatus == ACAMERA_OK, "Failed to ACAMERA_CONTROL_AE_MODE (reason: %d)", cameraStatus);
-        ASSERT(entry.tag == ACAMERA_CONTROL_AE_MODE && entry.type == ACAMERA_TYPE_BYTE && entry.count != 1,
-               "ACameraMetadata_const_entry failed");
-
-        // try set AE_MODE_ON
-        uint8_t ae_mode = t_ae_mode;
-        cameraStatus = ACaptureRequest_setEntry_u8( request, ACAMERA_CONTROL_AE_MODE, /*count*/ 1, &ae_mode);
-        ASSERT(cameraStatus == ACAMERA_OK, "ACaptureRequest_setEntry_u8 (reason: %d)", cameraStatus);
-
-        // read and confirm
-        cameraStatus = ACaptureRequest_getConstEntry(request, ACAMERA_CONTROL_AE_MODE, &entry);
-        ASSERT(cameraStatus == ACAMERA_OK, "Failed to ACAMERA_CONTROL_AE_MODE (reason: %d)", cameraStatus);
-        ASSERT(entry.data.u8[0] == ae_mode, "E mode key is not updated");
-
-        return true;
-    }
-
-    bool set_metadata_af_mode(ACaptureRequest *request, acamera_metadata_enum_android_control_af_mode_t t_af_mode)
-    {
-        // t_aeMode : ACAMERA_CONTROL_AF_MODE_OFF, ACAMERA_CONTROL_AF_MODE_AUTO
-        ACameraMetadata_const_entry entry;
-        cameraStatus = ACaptureRequest_getConstEntry(request, ACAMERA_CONTROL_AF_MODE, &entry);
-        ASSERT(cameraStatus == ACAMERA_OK, "Failed to ACAMERA_CONTROL_AF_MODE (reason: %d)", cameraStatus);
-        ASSERT(entry.tag == ACAMERA_CONTROL_AF_MODE && entry.type == ACAMERA_TYPE_BYTE && entry.count != 1,
-               "ACameraMetadata_const_entry failed");
-
-        // try set AE_MODE_ON
-        uint8_t af_mode = t_af_mode;
-        cameraStatus = ACaptureRequest_setEntry_u8( request, ACAMERA_CONTROL_AF_MODE, /*count*/ 1, &af_mode);
-        ASSERT(cameraStatus == ACAMERA_OK, "ACaptureRequest_setEntry_u8 (reason: %d)", cameraStatus);
-
-        // read and confirm
-        cameraStatus = ACaptureRequest_getConstEntry(request, ACAMERA_CONTROL_AF_MODE, &entry);
-        ASSERT(cameraStatus == ACAMERA_OK, "Failed to ACAMERA_CONTROL_AF_MODE (reason: %d)", cameraStatus);
-        ASSERT(entry.data.u8[0] == af_mode, "E mode key is not updated");
-
-        return true;
-    }
-
-private:
-    const ACameraMetadata *mChars;
-    camera_status_t cameraStatus;
-};
 
 
 Native_Camera::Native_Camera(camera_type type)
@@ -200,7 +106,9 @@ bool Native_Camera::MatchCaptureSizeRequest(ImageFormat *resView, int32_t width,
             cameraMetadata, ACAMERA_SCALER_AVAILABLE_STREAM_CONFIGURATIONS, &entry);
     // format of the data: format, width, height, input?, type int32
     bool foundIt = false;
-    Display_Dimension foundRes(1000, 1000); // max resolution for current gen phones
+    Display_Dimension foundRes(400, 300); // max resolution for current gen phones
+
+    // width/height = 4/3 인 것만 다룬다. 그리고 큰 것을 선택한다.
 
     for (int i = 0; i < entry.count; ++i)
     {
@@ -208,12 +116,17 @@ bool Native_Camera::MatchCaptureSizeRequest(ImageFormat *resView, int32_t width,
         int32_t format = entry.data.i32[i * 4 + 0];
         if (input) continue;
 
-        if (format == AIMAGE_FORMAT_YUV_420_888 || format == AIMAGE_FORMAT_JPEG)
+        // 우리는 YUV만 취급한다.
+        if (format == AIMAGE_FORMAT_YUV_420_888 )
         {
             Display_Dimension res(entry.data.i32[i * 4 + 1],
                                   entry.data.i32[i * 4 + 2]);
-            if (!disp.IsSameRatio(res)) continue;
-            if (foundRes > res)
+
+            LOGI("--- W -- H -- %d -- %d -- %f", res.width(), res.height(), (float)res.width()/res.height());
+
+
+            if (!foundRes.IsSameRatio(res)) continue;
+            if (res > foundRes)
             {
                 foundIt = true;
                 foundRes = res;
@@ -230,13 +143,13 @@ bool Native_Camera::MatchCaptureSizeRequest(ImageFormat *resView, int32_t width,
     {
         if (disp.IsPortrait())
         {
-            resView->width = 480;
-            resView->height = 640;
+            resView->width = 3000;
+            resView->height = 4000;
         }
         else
         {
-            resView->width = 640;
-            resView->height = 480;
+            resView->width = 4000;
+            resView->height = 3000;
         }
     }
     resView->format = AIMAGE_FORMAT_YUV_420_888;
@@ -267,10 +180,10 @@ bool Native_Camera::CreateCaptureSession(ANativeWindow *window)
     ACaptureRequest_addTarget(m_capture_request, m_camera_output_target);
 
     // setting automode
-    StaticInfo staticinfo (cameraMetadata) ;
-    staticinfo.set_metadata_control_mode(m_capture_request, ACAMERA_CONTROL_MODE_AUTO);
-    staticinfo.set_metadata_af_mode(m_capture_request, ACAMERA_CONTROL_AF_MODE_AUTO);
-    staticinfo.set_metadata_ae_mode(m_capture_request, ACAMERA_CONTROL_AE_MODE_ON);
+//    StaticInfo staticinfo (cameraMetadata) ;
+//    staticinfo.set_metadata_control_mode(m_capture_request, ACAMERA_CONTROL_MODE_AUTO);
+//    staticinfo.set_metadata_af_mode(m_capture_request, ACAMERA_CONTROL_AF_MODE_AUTO);
+//    staticinfo.set_metadata_ae_mode(m_capture_request, ACAMERA_CONTROL_AE_MODE_ON);
 
     // 주어진 ANativeWindow 객체에 대한 참조를 얻습니다. 참조가 제거될 때까지 객체가 삭제되지 못하게 합니다
     ANativeWindow_acquire(window);
@@ -285,7 +198,7 @@ bool Native_Camera::CreateCaptureSession(ANativeWindow *window)
             m_camera_device, m_capture_session_output_container,
             &m_capture_session_state_callbacks, &m_capture_session);
 
-    ACameraCaptureSession_setRepeatingRequest(m_capture_session, &m_capture_session_capture_callbacks, 1,
+    ACameraCaptureSession_setRepeatingRequest(m_capture_session, nullptr, 1,
                                               &m_capture_request, nullptr);
 
     return true;

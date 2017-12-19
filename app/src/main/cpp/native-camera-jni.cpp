@@ -430,6 +430,54 @@ private:
 
 class PreviewTestCase
 {
+
+private:
+    ACameraManager *createManager()
+    {
+        if (!mCameraManager)
+        {
+            mCameraManager = ACameraManager_create();
+        }
+        return mCameraManager;
+    }
+
+    CameraServiceListener mServiceListener;
+    ACameraManager_AvailabilityCallbacks mServiceCb{
+            &mServiceListener,
+            CameraServiceListener::onAvailable,
+            CameraServiceListener::onUnavailable
+    };
+    CameraDeviceListener mDeviceListener;
+    ACameraDevice_StateCallbacks mDeviceCb{
+            &mDeviceListener,
+            CameraDeviceListener::onDisconnected,
+            CameraDeviceListener::onError
+    };
+    CaptureSessionListener mSessionListener;
+    ACameraCaptureSession_stateCallbacks mSessionCb{
+            &mSessionListener,
+            CaptureSessionListener::onClosed,
+            CaptureSessionListener::onReady,
+            CaptureSessionListener::onActive
+    };
+    ACameraIdList *mCameraIdList = nullptr;
+    ACameraDevice *mDevice = nullptr;
+    AImageReader *mImgReader = nullptr;
+    ANativeWindow *mImgReaderAnw = nullptr;
+    ANativeWindow *mPreviewAnw = nullptr;
+    ACameraManager *mCameraManager = nullptr;
+    ACaptureSessionOutputContainer *mOutputs = nullptr;
+    ACaptureSessionOutput *mPreviewOutput = nullptr;
+    ACaptureSessionOutput *mImgReaderOutput = nullptr;
+    ACameraCaptureSession *mSession = nullptr;
+    ACaptureRequest *mPreviewRequest = nullptr;
+    ACaptureRequest *mStillRequest = nullptr;
+    ACameraOutputTarget *mReqPreviewOutput = nullptr;
+    ACameraOutputTarget *mReqImgReaderOutput = nullptr;
+    const char *mCameraId;
+    bool mMgrInited = false; // cameraId, serviceListener
+    bool mImgReaderInited = false;
+    bool mPreviewInited = false;
 public:
     ~PreviewTestCase()
     {
@@ -905,53 +953,6 @@ public:
         return &mSessionListener;
     }
 
-private:
-    ACameraManager *createManager()
-    {
-        if (!mCameraManager)
-        {
-            mCameraManager = ACameraManager_create();
-        }
-        return mCameraManager;
-    }
-
-    CameraServiceListener mServiceListener;
-    ACameraManager_AvailabilityCallbacks mServiceCb{
-            &mServiceListener,
-            CameraServiceListener::onAvailable,
-            CameraServiceListener::onUnavailable
-    };
-    CameraDeviceListener mDeviceListener;
-    ACameraDevice_StateCallbacks mDeviceCb{
-            &mDeviceListener,
-            CameraDeviceListener::onDisconnected,
-            CameraDeviceListener::onError
-    };
-    CaptureSessionListener mSessionListener;
-    ACameraCaptureSession_stateCallbacks mSessionCb{
-            &mSessionListener,
-            CaptureSessionListener::onClosed,
-            CaptureSessionListener::onReady,
-            CaptureSessionListener::onActive
-    };
-    ACameraIdList *mCameraIdList = nullptr;
-    ACameraDevice *mDevice = nullptr;
-    AImageReader *mImgReader = nullptr;
-    ANativeWindow *mImgReaderAnw = nullptr;
-    ANativeWindow *mPreviewAnw = nullptr;
-    ACameraManager *mCameraManager = nullptr;
-    ACaptureSessionOutputContainer *mOutputs = nullptr;
-    ACaptureSessionOutput *mPreviewOutput = nullptr;
-    ACaptureSessionOutput *mImgReaderOutput = nullptr;
-    ACameraCaptureSession *mSession = nullptr;
-    ACaptureRequest *mPreviewRequest = nullptr;
-    ACaptureRequest *mStillRequest = nullptr;
-    ACameraOutputTarget *mReqPreviewOutput = nullptr;
-    ACameraOutputTarget *mReqImgReaderOutput = nullptr;
-    const char *mCameraId;
-    bool mMgrInited = false; // cameraId, serviceListener
-    bool mImgReaderInited = false;
-    bool mPreviewInited = false;
 };
 
 jint throwAssertionError(JNIEnv *env, const char *message)
@@ -1867,9 +1868,14 @@ Java_android_hardware_camera2_cts_NativeStillCaptureTest_testStillCaptureNative(
     media_status_t mediaRet = AMEDIA_ERROR_UNKNOWN;
     int numCameras = 0;
     bool pass = false;
-    PreviewTestCase testCase;
+
     const char *outPath = env->GetStringUTFChars(jOutPath, nullptr);
     LOGI("%s: out path is %s", __FUNCTION__, outPath);
+
+    // CameraManager 구하기
+    PreviewTestCase testCase;
+
+    // CameraIdList 구하기
     camera_status_t ret = testCase.initWithErrorLog();
     if (ret != ACAMERA_OK)
     {
