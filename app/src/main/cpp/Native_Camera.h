@@ -585,10 +585,10 @@ private:
     int32_t* RGBBuffer_ = nullptr;
 };
 
-class StaticInfo
+class CameraMetaDataInfo
 {
 public:
-    explicit StaticInfo(ACameraMetadata *chars) : mChars(chars)
+    explicit CameraMetaDataInfo(const ACameraMetadata *chars) : mChars(chars)
     {
     }
 
@@ -610,13 +610,34 @@ public:
         }
         return false;
     }
+    uint8_t get_metadata_af_state()
+    {
+        ACameraMetadata_const_entry entry;
+
+        uint8_t af_state;
+        cameraStatus = ACameraMetadata_getConstEntry(mChars, ACAMERA_CONTROL_AF_STATE, &entry);
+        ASSERT(cameraStatus == ACAMERA_OK, "Failed to get_metadata_af_state (reason: %d)", cameraStatus);
+        return entry.data.u8[0] ;
+
+        /*
+         * ACAMERA_CONTROL_AF_STATE_INACTIVE                                = 0,
+         * ACAMERA_CONTROL_AF_STATE_PASSIVE_SCAN                            = 1,
+         * ACAMERA_CONTROL_AF_STATE_PASSIVE_FOCUSED                         = 2,
+         * ACAMERA_CONTROL_AF_STATE_ACTIVE_SCAN                             = 3,
+         * ACAMERA_CONTROL_AF_STATE_FOCUSED_LOCKED                          = 4,
+         * ACAMERA_CONTROL_AF_STATE_NOT_FOCUSED_LOCKED                      = 5,
+         * ACAMERA_CONTROL_AF_STATE_PASSIVE_UNFOCUSED                       = 6,
+         */
+
+    }
 
 private:
     const ACameraMetadata *mChars;
+    camera_status_t cameraStatus;
 };
 
 extern std::map<int, const char* > ACAMERA_metadata_tagnamemap ;
-class CameraMetaData
+class CameraMetaDataRequest
 {
 public:
 
@@ -676,9 +697,9 @@ public:
         ASSERT(cameraStatus == ACAMERA_OK, "ACaptureRequest_setEntry_u8 (reason: %d)", cameraStatus);
 
         // read and confirm
-        cameraStatus = ACaptureRequest_getConstEntry(mRequest, ACAMERA_CONTROL_MODE, &entry);
-        ASSERT(cameraStatus == ACAMERA_OK, "Failed to ACAMERA_CONTROL_MODE (reason: %d)", cameraStatus);
-        ASSERT(entry.data.u8[0] == control_mode, "E mode key is not updated");
+//        cameraStatus = ACaptureRequest_getConstEntry(mRequest, ACAMERA_CONTROL_MODE, &entry);
+//        ASSERT(cameraStatus == ACAMERA_OK, "Failed to ACAMERA_CONTROL_MODE (reason: %d)", cameraStatus);
+//        ASSERT(entry.data.u8[0] == control_mode, "E mode key is not updated");
 
         return true;
     }
@@ -694,16 +715,16 @@ public:
         ASSERT(cameraStatus == ACAMERA_OK, "ACaptureRequest_setEntry_u8 (reason: %d)", cameraStatus);
 
         // read and confirm
-        cameraStatus = ACaptureRequest_getConstEntry(mRequest, ACAMERA_CONTROL_AE_MODE, &entry);
-        ASSERT(cameraStatus == ACAMERA_OK, "Failed to ACAMERA_CONTROL_AE_MODE (reason: %d)", cameraStatus);
-        ASSERT(entry.data.u8[0] == ae_mode, "E mode key is not updated");
+//        cameraStatus = ACaptureRequest_getConstEntry(mRequest, ACAMERA_CONTROL_AE_MODE, &entry);
+//        ASSERT(cameraStatus == ACAMERA_OK, "Failed to ACAMERA_CONTROL_AE_MODE (reason: %d)", cameraStatus);
+//        ASSERT(entry.data.u8[0] == ae_mode, "E mode key is not updated");
 
         return true;
     }
 
     bool set_metadata_af_mode( acamera_metadata_enum_android_control_af_mode_t t_af_mode)
     {
-        // t_aeMode : ACAMERA_CONTROL_AF_MODE_OFF, ACAMERA_CONTROL_AF_MODE_AUTO
+        // t_aeMode : ACAMERA_CONTROL_AF_MODE_OFF, ACAMERA_CONTROL_AF_MODE_AUTO, ACAMERA_CONTROL_AF_MODE_CONTINUOUS_PICTURE
         ACameraMetadata_const_entry entry;
 
         // try set AE_MODE_ON
@@ -712,14 +733,51 @@ public:
         ASSERT(cameraStatus == ACAMERA_OK, "ACaptureRequest_setEntry_u8 (reason: %d)", cameraStatus);
 
         // read and confirm
-        cameraStatus = ACaptureRequest_getConstEntry(mRequest, ACAMERA_CONTROL_AF_MODE, &entry);
-        ASSERT(cameraStatus == ACAMERA_OK, "Failed to ACAMERA_CONTROL_AF_MODE (reason: %d)", cameraStatus);
-        ASSERT(entry.data.u8[0] == af_mode, "E mode key is not updated");
+//        cameraStatus = ACaptureRequest_getConstEntry(mRequest, ACAMERA_CONTROL_AF_MODE, &entry);
+//        ASSERT(cameraStatus == ACAMERA_OK, "Failed to ACAMERA_CONTROL_AF_MODE (reason: %d)", cameraStatus);
+//        ASSERT(entry.data.u8[0] == af_mode, "E mode key is not updated");
 
         return true;
     }
 
+    bool set_metadata_awb_mode( acamera_metadata_enum_acamera_control_awb_mode t_awb_mode)
+    {
+        // t_aeMode : ACAMERA_CONTROL_AWB_MODE_OFF, ACAMERA_CONTROL_AWB_MODE_AUTO
+        ACameraMetadata_const_entry entry;
+
+        // try set AE_MODE_ON
+        uint8_t awb_mode = t_awb_mode;
+        cameraStatus = ACaptureRequest_setEntry_u8( mRequest, ACAMERA_CONTROL_AWB_MODE,  1, &awb_mode);
+        ASSERT(cameraStatus == ACAMERA_OK, "ACaptureRequest_setEntry_u8 (reason: %d)", cameraStatus);
+
+        // read and confirm
+//        cameraStatus = ACaptureRequest_getConstEntry(mRequest, ACAMERA_CONTROL_AWB_MODE, &entry);
+//        ASSERT(cameraStatus == ACAMERA_OK, "Failed to ACAMERA_CONTROL_AWB_MODE (reason: %d)", cameraStatus);
+//        ASSERT(entry.data.u8[0] == awb_mode, "E mode key is not updated");
+
+        return true;
+    }
+
+    bool set_metadata_lens_focus_distance( float t_focus_distance)
+    {
+        ACameraMetadata_const_entry entry;
+
+        // try set AE_MODE_ON
+        float focus_distance = t_focus_distance;
+        cameraStatus = ACaptureRequest_setEntry_float(mRequest, ACAMERA_LENS_FOCUS_DISTANCE, 1,
+                                                      &focus_distance);
+        ASSERT(cameraStatus == ACAMERA_OK, "ACaptureRequest_setEntry_float (reason: %d)",
+               cameraStatus);
+
+        // read and confirm
+//        cameraStatus = ACaptureRequest_getConstEntry(mRequest, ACAMERA_LENS_FOCUS_DISTANCE, &entry);
+//        ASSERT(cameraStatus == ACAMERA_OK, "Failed to ACAMERA_LENS_FOCUS_DISTANCE (reason: %d)", cameraStatus);
+//        ASSERT(entry.data.f[0] == focus_distance, "E mode key is not updated");
+
+        return true;
+    }
 public:
+
     camera_status_t cameraStatus;
     ACaptureRequest *mRequest;
 
@@ -729,42 +787,64 @@ public:
 class CameraCaptureListener
 {
 public:
+
+    //2.  prototype : ACameraCaptureSession_captureCallback_start
     static void onCaptureStarted(void* context, ACameraCaptureSession* session,const ACaptureRequest* request, int64_t timestamp)
     {
         LOGI("onCaptureStarted");
     }
+
+    //1. prototype : ACameraCaptureSession_captureCallback_result
     static void onCaptureProgressed(void* context, ACameraCaptureSession* session, ACaptureRequest* request, const ACameraMetadata* result)
     {
-        LOGI("onCaptureProgressed");
+        CameraMetaDataInfo info(result);
+        if(result)
+            LOGI("onCaptureProgressed status: %d", info.get_metadata_af_state());
+        else
+            LOGI("onCaptureProgressed");
     }
+
+    //3.  prototype : ACameraCaptureSession_captureCallback_result
     static void onCaptureCompleted(void* context, ACameraCaptureSession* session, ACaptureRequest* request, const ACameraMetadata* result)
     {
-        LOGI("onCaptureCompleted");
+        CameraMetaDataInfo info(result);
+        if(result)
+            LOGI("onCaptureCompleted status: %d", info.get_metadata_af_state());
+        else
+            LOGI("onCaptureCompleted");
     }
+
+    // prototype : ACameraCaptureSession_captureCallback_failed
     static void onCaptureFailed(void* context, ACameraCaptureSession* session, ACaptureRequest* request, ACameraCaptureFailure* failure)
     {
         LOGI("onCaptureFailed");
     }
+
+    //4.  prototype : ACameraCaptureSession_captureCallback_sequenceEnd
     static void onCaptureSequenceCompleted(void* context, ACameraCaptureSession* session,int sequenceId, int64_t frameNumber)
     {
         LOGI("onCaptureSequenceCompleted");
     }
+
+    // prototype : ACameraCaptureSession_captureCallback_sequenceAbort
     static void onCaptureSequenceAborted(void* context, ACameraCaptureSession* session,int sequenceId)
     {
         LOGI("onCaptureSequenceAborted");
     }
+
+    // prototype : ACameraCaptureSession_captureCallback_bufferLost
     static void onCaptureBufferLost(void* context, ACameraCaptureSession* session,ACaptureRequest* request, ANativeWindow* window, int64_t frameNumber)
     {
         LOGI("onCaptureBufferLost");
     }
 
-private:
+public:
 };
 
 class PreviewTestCase
 {
 
-private:
+public:
     ACameraManager *createManager()
     {
         if (!mCameraManager)
@@ -793,6 +873,7 @@ private:
             CaptureSessionListener::onReady,
             CaptureSessionListener::onActive
     };
+
     CameraCaptureListener  cameracaptureListener;
     ACameraCaptureSession_captureCallbacks m_capture_session_capture_callbacks
     {
@@ -806,7 +887,7 @@ private:
         CameraCaptureListener::onCaptureBufferLost,
     };
 
-    CameraMetaData mcamerametadata ;
+    CameraMetaDataRequest mcamerametadata ;
 
     ACameraIdList *mCameraIdList = nullptr;
     ACameraDevice *mDevice = nullptr;
@@ -1193,8 +1274,12 @@ public:
 
             // print out the camera characteric
             mcamerametadata.mRequest = mPreviewRequest;
-            mcamerametadata.get_metadata_all_tags();
-            mcamerametadata.set_metadata_af_mode(ACAMERA_CONTROL_AF_MODE_CONTINUOUS_PICTURE);
+            //mcamerametadata.get_metadata_all_tags();
+            //mcamerametadata.set_metadata_control_mode(ACAMERA_CONTROL_MODE_AUTO) ;
+            mcamerametadata.set_metadata_ae_mode(ACAMERA_CONTROL_AE_MODE_ON);
+            mcamerametadata.set_metadata_awb_mode(ACAMERA_CONTROL_AWB_MODE_AUTO) ;
+            mcamerametadata.set_metadata_af_mode(ACAMERA_CONTROL_AF_MODE_OFF);
+            mcamerametadata.set_metadata_lens_focus_distance(0.0f) ;
 
         }
         else
