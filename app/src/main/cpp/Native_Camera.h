@@ -616,8 +616,14 @@ public:
 
         uint8_t af_state;
         cameraStatus = ACameraMetadata_getConstEntry(mChars, ACAMERA_CONTROL_AF_STATE, &entry);
-        ASSERT(cameraStatus == ACAMERA_OK, "Failed to get_metadata_af_state (reason: %d)", cameraStatus);
-        return entry.data.u8[0] ;
+        if (cameraStatus == ACAMERA_OK)
+            return entry.data.u8[0] ;
+        else
+        {
+            LOGI( "Failed to ACameraMetadata_getConstEntry");
+            return 100;
+        }
+
 
         /*
          * ACAMERA_CONTROL_AF_STATE_INACTIVE                                = 0,
@@ -1276,10 +1282,10 @@ public:
             mcamerametadata.mRequest = mPreviewRequest;
             //mcamerametadata.get_metadata_all_tags();
             //mcamerametadata.set_metadata_control_mode(ACAMERA_CONTROL_MODE_AUTO) ;
-            mcamerametadata.set_metadata_ae_mode(ACAMERA_CONTROL_AE_MODE_ON);
-            mcamerametadata.set_metadata_awb_mode(ACAMERA_CONTROL_AWB_MODE_AUTO) ;
-            mcamerametadata.set_metadata_af_mode(ACAMERA_CONTROL_AF_MODE_OFF);
-            mcamerametadata.set_metadata_lens_focus_distance(0.0f) ;
+            //mcamerametadata.set_metadata_ae_mode(ACAMERA_CONTROL_AE_MODE_ON);
+            //mcamerametadata.set_metadata_awb_mode(ACAMERA_CONTROL_AWB_MODE_AUTO) ;
+            //mcamerametadata.set_metadata_af_mode(ACAMERA_CONTROL_AF_MODE_OFF);
+            //mcamerametadata.set_metadata_lens_focus_distance(0.0f) ;
 
         }
         else
